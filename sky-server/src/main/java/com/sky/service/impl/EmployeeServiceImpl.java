@@ -8,12 +8,14 @@ import com.sky.context.BaseContext;
 import com.sky.dto.EmployeeDTO;
 import com.sky.dto.EmployeeLoginDTO;
 import com.sky.dto.EmployeePageQueryDTO;
+import com.sky.dto.EmployeePasswordDTO;
 import com.sky.entity.Employee;
 import com.sky.exception.AccountLockedException;
 import com.sky.exception.AccountNotFoundException;
 import com.sky.exception.PasswordErrorException;
 import com.sky.mapper.EmployeeMapper;
 import com.sky.result.PageResult;
+import com.sky.result.Result;
 import com.sky.service.EmployeeService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,12 +80,12 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setStatus(StatusConstant.ENABLE);
         //设置默认密码
         employee.setPassword(DigestUtils.md5DigestAsHex("123456".getBytes()));
-        //设置当前记录的创建时间和修改时间
-        employee.setCreateTime(LocalDateTime.now());
-        employee.setUpdateTime(LocalDateTime.now());
-        //设置当前记录创建人和修改人id
-        employee.setCreateUser(BaseContext.getCurrentId());
-        employee.setUpdateUser(BaseContext.getCurrentId());
+//        //设置当前记录的创建时间和修改时间
+//        employee.setCreateTime(LocalDateTime.now());
+//        employee.setUpdateTime(LocalDateTime.now());
+//        //设置当前记录创建人和修改人id
+//        employee.setCreateUser(BaseContext.getCurrentId());
+//        employee.setUpdateUser(BaseContext.getCurrentId());
         employeeMapper.insert(employee);
 
     }
@@ -143,10 +145,28 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         Employee employee = new Employee();
         BeanUtils.copyProperties(employeeDTO, employee);
-        employee.setUpdateTime(LocalDateTime.now());
-        employee.setUpdateUser(BaseContext.getCurrentId());
         employeeMapper.update(employee);
 
+    }
+
+    /**
+     * 编辑密码
+     *
+     * @param employeePasswordDTO 员工密码dto
+     * @return {@link Result }
+     */
+    @Override
+    public Result<String> editPassword(EmployeePasswordDTO employeePasswordDTO) {
+        //select * from employee where id = ?
+        Employee employee = employeeMapper.getById(employeePasswordDTO.getId());
+        if (!employee.getPassword().equals(DigestUtils.md5DigestAsHex(employeePasswordDTO.getOldPassword().getBytes()))) {
+            //原密码错误
+            return Result.error("原密码错误");
+        }else{
+            employee.setPassword(DigestUtils.md5DigestAsHex(employeePasswordDTO.getNewPassword().getBytes()));
+            employeeMapper.update(employee);
+            return Result.success();
+        }
     }
 
 }
