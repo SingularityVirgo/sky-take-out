@@ -38,7 +38,7 @@
         left join category c on d.category_id = c.id
         <where>
             <if test="categoryId != null">
-                and d.category_id = concat('%',#{categoryId},'%')
+                and d.category_id = #{categoryId}
             </if>
         </where>
         order by d.create_time desc
@@ -64,6 +64,8 @@
             <if test="description != null">
                 description = #{description},
             </if>
+            update_time = #{updateTime},
+            update_user = #{updateUser}
         </set>
         where id = #{id}
     </update>
