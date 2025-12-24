@@ -2,14 +2,17 @@ package com.sky.service.impl;
 
 import com.sky.service.ShopService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
+
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.NumberUtils;
+
 
 @Service
 public class ShopServiceImpl implements ShopService {
     public static final String SHOP_STATUS = "SHOP_STATUS";
     @Autowired
-    private RedisTemplate redisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
     /**
      * 设置状态
      *
@@ -17,11 +20,22 @@ public class ShopServiceImpl implements ShopService {
      */
     @Override
     public void setStatus(Integer status) {
-        redisTemplate.opsForValue().set(SHOP_STATUS,status);
+        stringRedisTemplate.opsForValue().set(SHOP_STATUS, String.valueOf(status));
     }
 
+    /**
+     * 获取状态
+     *
+     * @return {@link Integer }
+     */
     @Override
     public Integer getStatus() {
-        return (Integer) redisTemplate.opsForValue().get(SHOP_STATUS); // Return the shop status from Redis
+        String status = stringRedisTemplate.opsForValue().get(SHOP_STATUS);
+        if(status != null){
+            return NumberUtils.parseNumber(status,Integer.class);
+        }else{
+            return null;
+        }
+         // Return the shop status from Redis
     }
 }

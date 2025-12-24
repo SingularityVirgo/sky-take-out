@@ -1,8 +1,10 @@
 package com.sky.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.sky.constant.MessageConstant;
+
 import com.sky.constant.StatusConstant;
 import com.sky.dto.DishDTO;
 import com.sky.dto.DishPageQueryDTO;
@@ -18,10 +20,20 @@ import com.sky.vo.DishVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+
+import static com.sky.constant.RedisConstant.CACHE_DISH_LIST_KEY;
 
 /**
  * 碟形服务实施
@@ -32,12 +44,15 @@ import java.util.List;
 @Service
 @Slf4j
 public class DishServiceImpl implements DishService {
+
     @Autowired
     private DishMapper dishMapper;
     @Autowired
     private DishFlavorMapper dishFlavorMapper;
     @Autowired
     private SetmealDishMapper setmealDishMapper;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
     /**
      * 保存与风味
      *
@@ -61,6 +76,7 @@ public class DishServiceImpl implements DishService {
             //向菜品口味表插入n条数据
             dishFlavorMapper.insertBatch(flavors);
         }
+        stringRedisTemplate.delete(CACHE_DISH_LIST_KEY + dishDTO.getCategoryId());
 
     }
 
@@ -106,6 +122,8 @@ public class DishServiceImpl implements DishService {
         dishMapper.deleteBatch(ids);
         //批量删除菜品口味表数据
         dishFlavorMapper.deleteByDishIds(ids);
+        //删除缓存数据
+        deleteAllDishCategoryWithLua();
 
     }
 
@@ -148,6 +166,7 @@ public class DishServiceImpl implements DishService {
             flavors.forEach(flavor -> flavor.setDishId(dishDTO.getId()));
             dishFlavorMapper.insertBatch(flavors);
         }
+       deleteAllDishCategoryWithLua();
 
 
     }
@@ -165,6 +184,7 @@ public class DishServiceImpl implements DishService {
                 .id(id)
                 .build();
         dishMapper.update(dish);
+        deleteAllDishCategoryWithLua();
     }
 
     /**
@@ -181,4 +201,71 @@ public class DishServiceImpl implements DishService {
         return list;
 
     }
+
+    /**
+     * 条件查询菜品和口味
+     * @param dish
+     * @return
+     */
+    public List<DishVO> listWithFlavor(Dish dish) {
+
+        String key = CACHE_DISH_LIST_KEY + dish.getCategoryId();
+        // 查询redis中是否缓存菜品数据
+        String json = stringRedisTemplate.opsForValue().get(key);
+        // 缓存存在，直接返回，无需查询数据库
+        if (json != null && json.length() > 0) {
+            return JSON.parseArray(json, DishVO.class);
+        }
+        // 缓存不存在，将数据查询数据库，然后缓存
+        List<DishVO> dishVOList = dishMapper.list(dish);
+        stringRedisTemplate.opsForValue().set(key, JSON.toJSONString(dishVOList));
+        List<DishVO> newDishVOList = new ArrayList<>();
+
+        for (DishVO dishVO : dishVOList) {
+            //根据菜品id查询对应的口味
+            List<DishFlavor> flavors = dishFlavorMapper.getByDishId(dishVO.getId());
+
+            dishVO.setFlavors(flavors);
+            newDishVOList.add(dishVO);
+        }
+
+        return newDishVOList;
+    }
+
+    private void deleteAllDishCategoryWithLua() {
+        String luaScript =
+                "local keys = redis.call('KEYS', ARGV[1]) " +
+                        "for i=1,#keys,5000 do " +
+                        "   redis.call('DEL', unpack(keys, i, math.min(i+4999, #keys))) " +
+                        "end " +
+                        "return #keys";
+
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptText(luaScript);
+        script.setResultType(Long.class);
+
+        // 注意：KEYS 命令的第一个参数必须是 key 数量，这里传 0
+        Long deletedCount = stringRedisTemplate.execute(script,
+                Collections.emptyList(),
+                "dish:list:category:*");
+
+        log.info("Lua脚本批量删除缓存数量: {}", deletedCount);
+    }
+    /*public void deleteAllDishCategoryCache() {
+        String pattern = "dish:list:category:*";
+
+        try (Cursor<byte[]> cursor = stringRedisTemplate.getConnectionFactory()
+                .getConnection()
+                .scan(ScanOptions.scanOptions().match(pattern).count(1000).build())) {
+
+            while (cursor.hasNext()) {
+                byte[] keyBytes = cursor.next();
+                String key = new String(keyBytes, StandardCharsets.UTF_8);
+                stringRedisTemplate.delete(key);
+                log.info("删除缓存: {}", key);
+            }
+        } catch (Exception e) {
+            log.error("批量删除缓存失败", e);
+        }
+    }*/
 }

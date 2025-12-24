@@ -73,4 +73,12 @@ public interface DishMapper {
      * @return {@link List }<{@link DishVO }>
      */
     List<DishVO> list(Long categoryId);
+
+    /**
+     * 列表
+     *
+     * @param dish 碟子
+     * @return {@link List }<{@link Dish }>
+     */
+    List<DishVO> list(Dish dish);
 }
