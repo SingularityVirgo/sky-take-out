@@ -22,6 +22,8 @@ import com.sky.vo.SetmealVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +41,7 @@ public class SetmealServiceImpl implements SetmealService {
      */
     @Override
     @Transactional
+    @CacheEvict(cacheNames = "setmealCache",key="#setmealDTO.categoryId")
     public void save(SetmealDTO setmealDTO) {
         Setmeal setmeal = new Setmeal();
         BeanUtils.copyProperties(setmealDTO,setmeal);
@@ -72,6 +75,7 @@ public class SetmealServiceImpl implements SetmealService {
      * @param ids 身份证
      */
     @Override
+    @CacheEvict(cacheNames = "setmealCache",allEntries = true)
     public void deleteBatch(List<Long> ids) {
         //判断当前菜品是否能删除--删除的菜品状态不能是启售状态
         for(Long id:ids){
@@ -108,6 +112,7 @@ public class SetmealServiceImpl implements SetmealService {
      */
     @Override
     @Transactional
+    @CacheEvict(cacheNames = "setmealCache",allEntries = true)
     public void update(SetmealDTO setmealDTO) {
         Setmeal setmeal = new Setmeal();
         BeanUtils.copyProperties(setmealDTO,setmeal);
@@ -132,6 +137,7 @@ public class SetmealServiceImpl implements SetmealService {
      * @param id     id
      */
     @Override
+    @CacheEvict(cacheNames = "setmealCache",allEntries = true)
     public void startOrStop(Integer status, Long id) {
         Setmeal setmeal = Setmeal.builder()
                 .status(status)
@@ -144,6 +150,8 @@ public class SetmealServiceImpl implements SetmealService {
      * @param setmeal
      * @return
      */
+    @Override
+    @Cacheable(cacheNames = "setmealCache",key = "#setmeal.categoryId")
     public List<Setmeal> list(Setmeal setmeal) {
         List<Setmeal> list = setmealMapper.list(setmeal);
         return list;
@@ -154,6 +162,7 @@ public class SetmealServiceImpl implements SetmealService {
      * @param id
      * @return
      */
+    @Override
     public List<DishItemVO> getDishItemById(Long id) {
         return setmealMapper.getDishItemBySetmealId(id);
     }
