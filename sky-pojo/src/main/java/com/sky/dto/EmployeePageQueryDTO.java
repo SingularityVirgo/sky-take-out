@@ -4,6 +4,12 @@ import lombok.Data;
 
 import java.io.Serializable;
 
+/**
+ * 员工页查询dto
+ *
+ * @author maziy
+ * @date 2025/12/17
+ */
 @Data
 public class EmployeePageQueryDTO implements Serializable {
 
