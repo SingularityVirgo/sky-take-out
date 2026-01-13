@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.ReportMapper">
+    <select id="getDailyTurnoverList" resultType="java.util.Map">
+        SELECT
+        DATE(order_time) AS orderDate,
+        SUM(amount) AS turnover
+        FROM sky_take_out.orders
+        WHERE
+        order_time &gt; #{begin}
+        AND order_time &lt; #{end}
+        AND status = 5  -- 已完成订单
+        GROUP BY DATE(order_time)
+    </select>
+    <select id="getDailyNewUserList" resultType="java.util.Map">
+        SELECT
+        DATE(create_time)AS createTime,
+        COUNT(*) AS newUser
+        FROM user  <!-- 假设用户表名为user -->
+        <where>
+            <if test="begin != null">
+                create_time &gt;= #{begin}
+            </if>
+            <if test="end != null">
+                AND create_time &lt;= #{end}
+            </if>
+        </where>
+        GROUP BY DATE(create_time)
+    </select>
+    <select id="getDailyValidOrderCountList" resultType="map">
+        SELECT
+        DATE(order_time) AS orderDate,
+        COUNT(*) AS orderCount
+        FROM sky_take_out.orders
+        <where>
+            order_time &gt; #{begin}
+            AND order_time &lt; #{end}
+        <if test="status != null">
+            AND status = #{status}
+        </if>  <!-- 已完成状态 -->
+        </where>
+        GROUP BY DATE(order_time)
+    </select>
+    <select id="getSalesTop10" resultType="java.util.Map">
+        SELECT
+        d.name AS nameList,
+        SUM(d.number) AS numberList
+        FROM sky_take_out.order_detail d
+        JOIN sky_take_out.orders o ON d.order_id = o.id
+        WHERE
+        o.order_time &gt; #{begin}
+        AND o.order_time &lt; #{end}
+        AND o.status = 5
+        GROUP BY d.name
+        ORDER BY numberList DESC
+        LIMIT 10
+    </select>
+
+
+</mapper>
